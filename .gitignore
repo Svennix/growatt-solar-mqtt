@@ -10,7 +10,6 @@
 
 # Secrets and local-only config — NEVER commit
 include/config.h
-ota_local.ini
 old.config
 **/config.h
 **/secrets.h

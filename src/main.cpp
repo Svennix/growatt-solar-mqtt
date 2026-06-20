@@ -17,6 +17,7 @@
 #include <ArduinoJson.h>
 #include <ESPmDNS.h>
 #include <Ticker.h>
+#include <time.h>
 
 // All credentials, pins and timing live in config.h (gitignored).
 // Copy include/config.example.h to include/config.h and edit it.
@@ -33,6 +34,9 @@ const char* mqtt_password = MQTT_PASSWORD;
 const char* clientID      = MQTT_CLIENT_ID;
 const char* topicRoot     = MQTT_TOPIC_ROOT;
 const char* ota_password  = OTA_PASSWORD;
+const char* ntp_server1   = NTP_SERVER_1;
+const char* ntp_server2   = NTP_SERVER_2;
+const char* ntp_timezone  = NTP_TIMEZONE;
 
 // ========== MQTT TOPICS ==========
 char topicData[64];
@@ -496,6 +500,14 @@ void publishSystemStatus() {
     doc["hostname"] = deviceHostname;
     doc["version"] = buildversion;
 
+    // Local time (ISO-8601). Only added once NTP has synced the clock.
+    struct tm ti;
+    if (getLocalTime(&ti, 0)) {
+        char ts[25];
+        strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S", &ti);
+        doc["time"] = ts;
+    }
+
     JsonObject mb = doc["modbus"].to<JsonObject>();
     mb["reads"]  = modbusReadCount;
     mb["errors"] = modbusErrorCount;
@@ -591,6 +603,29 @@ void setupOTA() {
     Serial.printf("[OTA] Ready - hostname: %s\n", deviceHostname);
 }
 
+void setupTime() {
+    // Configure SNTP with two NTP servers (second is a fallback) and the local
+    // timezone as a POSIX TZ string. The ESP32 core keeps the RTC in sync
+    // automatically after this call (re-syncs roughly every hour).
+    configTzTime(ntp_timezone, ntp_server1, ntp_server2);
+    Serial.printf("[NTP] Servers: %s, %s\n", ntp_server1, ntp_server2);
+
+    Serial.print("[NTP] Syncing time");
+    struct tm timeinfo;
+    int retries = 0;
+    while (!getLocalTime(&timeinfo, 1000) && retries < 10) {
+        Serial.print(".");
+        retries++;
+    }
+    if (retries < 10) {
+        char buf[32];
+        strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
+        Serial.printf("\n[NTP] Time synced: %s\n", buf);
+    } else {
+        Serial.println("\n[NTP] Sync timed out (will keep retrying in background)");
+    }
+}
+
 // ========== SETUP ==========
 void setup() {
     Serial.begin(SERIAL_RATE);
@@ -626,6 +661,8 @@ void setup() {
 
     if (MDNS.begin(deviceHostname))
         Serial.printf("[mDNS] Responder started: %s.local\n", deviceHostname);
+
+    setupTime();
 
     RS485Serial.begin(MODBUS_BAUD, SERIAL_8N1, RS485_RX, RS485_TX);
     modbus.begin(MODBUS_SLAVE_ID, RS485Serial);

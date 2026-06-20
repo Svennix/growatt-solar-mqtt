@@ -28,6 +28,13 @@
 #define OTA_PASSWORD        "ota_password"
 #define OTA_PORT            3232
 
+// NTP Time Synchronization (up to 2 servers; second is a fallback)
+#define NTP_SERVER_1        "pool.ntp.org"
+#define NTP_SERVER_2        "time.google.com"
+// POSIX timezone string. Default: Europe/Oslo (CET/CEST with automatic DST).
+// Examples: UTC  ->  "UTC0"   |   London  ->  "GMT0BST,M3.5.0/1,M10.5.0"
+#define NTP_TIMEZONE        "CET-1CEST,M3.5.0,M10.5.0/3"
+
 // ========== HARDWARE CONFIGURATION ==========
 // ESP32-C6-Mini + TTL485-V2.0 RS485 module (auto direction, no DE/RE pins)
 #define RS485_RX            4         // GPIO4 - UART1 RX (from TTL485 RX)
